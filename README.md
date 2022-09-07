@@ -4,7 +4,7 @@ Spiritual successor to the work by https://github.com/jonathansm/arista-scripts.
 This EOS agent will configure interfaces based on MAC or OUI connected to ports when they become operational.  Configuration data can be stored in either YAML or JSON format and is stored in flash.  Ports can also be configured to a default state when they switch to the link down state.
 
 ## Config
-Configuration data is stored in either /mnt/flash/autoPortConfigAgent.json or /mnt/flash/autoPortConfigAgent.yml depending on which configuration language is preferred.  the YAML configuration file will be attempted first falling back to the json file.  Examples of both formats are provided in this repository.
+Configuration data is stored in /mnt/flash/autoPortConfigAgent.config and can be in YAML or JSON format, with the YAML preferred.  Examples of both formats are provided in this repository.
 
 
 ## Run Location and parameters

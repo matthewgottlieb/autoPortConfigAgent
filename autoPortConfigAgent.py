@@ -25,7 +25,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         #  learned anything to configure on.
         self.interestingInterfaces = []
 
-        self.configFile = "/mnt/flash/autoPortConfig.yml"
+        self.configFile = "/mnt/flash/autoPortConfig.config"
 
     # the on_agent_option function is a standard callback called when an option is
     #  set in the configuration.  it can be called after agent startup if the user
