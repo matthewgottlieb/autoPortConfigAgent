@@ -38,6 +38,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             self.tracer.trace5("Disabling all interface monitoring")
             self.watch_all_intfs(False)
             self.watch_all_mac_entries(False)
+            self.interestingInterfaces = []
 
             # we are wanting to monitor a new set of interfaces
             #  first, use pyeapi to pull the interface names
