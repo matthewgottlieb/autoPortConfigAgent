@@ -7,6 +7,9 @@ import eossdk, yaml, json, sys, pyeapi, uuid
 def formatMac(mac):
     return mac.replace(':', '').replace('.','').replace('-', '').strip().lower()
 
+# our monitor inherits from the
+#  interface handler in order to subscribe to intf up/down events
+#  the mac table handler in order to subscribe to mac learn events
 class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableHandler):
     def __init__(self, intfMgr, agentMgr, macMgr):
         eossdk.AgentHandler.__init__(self, agentMgr)
@@ -17,12 +20,19 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         self.agentMgr_ = agentMgr
         self.macTableMgr_ = macMgr
         self.pyeapi = pyeapi.connect_to("localhost")
+        # this list keeps track of which interfaces have received a linkup event
+        #  and which we are still interested in mac events for as we have not yet
+        #  learned anything to configure on.
         self.interestingInterfaces = []
 
         self.configFile = "/mnt/flash/autoPortConfig.yml"
 
+    # the on_agent_option function is a standard callback called when an option is
+    #  set in the configuration.  it can be called after agent startup if the user
+    #  reconfigures.  it isn't called by default on startup so we manually call it
+    #  on initial startup
     def on_agent_option(self, optionName, value):
-        # then if we have a new batch of interfaces to watch, let's figure them out
+        # if we have a new batch of interfaces to watch, let's figure them out
         if optionName == "interfaces":
             # turn off any monitoring that's already on
             self.tracer.trace5("Disabling all interface monitoring")
@@ -161,6 +171,10 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                     self.tracer.trace0("Setting a configuration on {}".format(intfStr))
                     self.configureInterface(intfStr, portConfig['states']['linkup'])
 
+    # by default we will remove all configuration from the interface before adding new
+    #  configuration specified in the conf file.  using a config session allows us to
+    #  potentially apply an identical configuration on the interface without causing
+    #  impact to network traffic
     def configureInterface(self, intfStr, portConfig):
         sessionID = uuid.uuid1()
         commandSequence = ['configure session {}'.format(sessionID),
@@ -168,6 +182,9 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 'interface {}'.format(intfStr) ] + portConfig + ['commit']
         self.pyeapi.config(commandSequence)
 
+    # the search() function will loop over all configurations in the conf file
+    #  and search for both an exact match, an oui match, then finally the default
+    #  returning the configurations in that order, or None if there is no default
     def search(self, mac):
         ouiResult = None
         macResult = None
