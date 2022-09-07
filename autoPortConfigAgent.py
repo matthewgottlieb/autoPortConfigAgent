@@ -8,18 +8,11 @@ def formatMac(mac):
     return mac.replace(':', '').replace('.','').replace('-', '').strip().lower()
 
 class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableHandler):
-    def log(self, sev, outStr):
-        if sev == 0:
-            self.tracer.trace0(outStr)
-            print(outStr)
-        elif sev == 5:
-            self.tracer.trace5(outStr)
-
     def __init__(self, intfMgr, agentMgr, macMgr):
         eossdk.AgentHandler.__init__(self, agentMgr)
         eossdk.IntfHandler.__init__(self, intfMgr)
         eossdk.MacTableHandler.__init__(self, macMgr)
-        self.tracer = eossdk.Tracer("EosSdkInterfaceAutoConfigure")
+        self.tracer = eossdk.Tracer("autoPortConfigAgent")
         self.intfMgr_ = intfMgr
         self.agentMgr_ = agentMgr
         self.macTableMgr_ = macMgr
@@ -32,7 +25,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         # then if we have a new batch of interfaces to watch, let's figure them out
         if optionName == "interfaces":
             # turn off any monitoring that's already on
-            self.log(5, "Disabling all interface monitoring")
+            self.tracer.trace5("Disabling all interface monitoring")
             self.watch_all_intfs(False)
             self.watch_all_mac_entries(False)
 
@@ -53,7 +46,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 #   and start the operstatus monitoring for each
                 for intf in self.interfaces:
                     # grab a handle for this interface from eossdk
-                    self.log(1, "monitoring interface {}".format(intf))
+                    self.tracer.trace1("monitoring interface {}".format(intf))
                     self.watch_intf(eossdk.IntfId(intf), True)
 
     def on_initialized(self):
@@ -65,22 +58,22 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             with open(self.configFile, "r") as configFile:
                 # let's try yaml first, then fall to json
                 try:
-                    self.log(5, "trying yaml")
+                    self.tracer.trace5("trying yaml")
                     self.configs = yaml.safe_load(configFile)
-                    self.log(1, " - successfully loaded the config as yml")
+                    self.tracer.trace1(" - successfully loaded the config as yml")
                 except:
                     # we failed loading yaml.  let's try json
                     try:
-                        self.log(5, "trying json")
+                        self.tracer.trace5("trying json")
                         self.configs = json.load(configFile)
-                        self.log(1, " - successfully loaded the config as json")
+                        self.tracer.trace1(" - successfully loaded the config as json")
                     except:
                         pass
         except:
-            self.log(0, "Could not find the configuration file")
+            self.tracer.trace0("Could not find the configuration file")
 
         if len(self.configs) == 0:
-            self.log(0, "Error loading the configuration")
+            self.tracer.trace0("Error loading the configuration")
             return
 
         # now we need to reformat all the macs and ouis to something consistent and usable
@@ -96,10 +89,10 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         intfs = self.agentMgr_.agent_option("interfaces")
         if intfs in ("", "all"):
             intfs = ""
-            self.log(0, "No specific interfaces have been set to be monitored!, monitoring everything")
+            self.tracer.trace0("No specific interfaces have been set to be monitored!, monitoring everything")
 
         self.on_agent_option("interfaces", intfs)
-        self.log(0, "Fully initialized, running")
+        self.tracer.trace0("Fully initialized, running")
 
     def on_oper_status(self, intfId, operState):
         """ Callback provided by IntfHandler when an interface's
@@ -138,7 +131,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 commandSequence = ['configure session {}'.format(sessionID),
                         'default interface {}'.format(intfStr),
                         'interface {}'.format(intfStr) ] +defaultCommands + ['commit']
-                self.log(0, "Defaulting interface {}".format(intfStr))
+                self.tracer.trace0("Defaulting interface {}".format(intfStr))
                 self.pyeapi.config(commandSequence)
 
     def on_mac_entry_set(self, mac):
@@ -161,11 +154,11 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 macStr = mac.mac_key().eth_addr().to_string()
                 portConfig = self.search(formatMac(macStr))
                 if not portConfig:
-                    self.log(2, "we didn't find a match for mac {}".format(macStr))
+                    self.tracer.trace2("we didn't find a match for mac {}".format(macStr))
                     return
 
                 if 'states' in portConfig and 'linkup' in portConfig['states']:
-                    self.log(0, "Setting a configuration on {}".format(intfStr))
+                    self.tracer.trace0("Setting a configuration on {}".format(intfStr))
                     self.configureInterface(intfStr, portConfig['states']['linkup'])
 
     def configureInterface(self, intfStr, portConfig):
@@ -180,15 +173,15 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         macResult = None
 
         # main search loop
-        self.log(1, "searching for {}".format(mac))
+        self.tracer.trace1("searching for {}".format(mac))
         for config in self.configs['configs']:
             # look for specific matches for each mac address in the mac table
             if mac in config['config']['macs']:
-                self.log(1, "found a specific match for {} in {}".format(mac, config))
+                self.tracer.trace1("found a specific match for {} in {}".format(mac, config))
                 macResult = config['config']
             # look for oui matches
             if mac[:6] in config['config']['ouis']:
-                self.log(1, "found an oui match for {} in {}".format(mac, config))
+                self.tracer.trace1("found an oui match for {} in {}".format(mac, config))
                 ouiResult = config['config']
 
         if macResult:
