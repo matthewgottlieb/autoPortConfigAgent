@@ -1,0 +1,22 @@
+---
+default:
+  states:
+    linkdown:
+      - "description default"
+configs:
+  - config:
+      name: "config1"
+      macs:
+        - "68d7.9a3c.2b3f"
+      states:
+        linkup:
+          - "description config1"
+  - config:
+      name: "config2"
+      macs:
+        - "aaaa.aaaa.aaaa"
+      ouis:
+        - "7845.58"
+      states:
+        linkup:
+          - "description config2"
