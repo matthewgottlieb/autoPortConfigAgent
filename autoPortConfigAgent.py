@@ -40,6 +40,10 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             self.watch_all_mac_entries(False)
             self.interestingInterfaces = []
 
+            if intfs in ("", "all"):
+                intfs = ""
+                self.tracer.trace0("No specific interfaces have been set to be monitored!, monitoring everything")
+
             # we are wanting to monitor a new set of interfaces
             #  first, use pyeapi to pull the interface names
             #  of the requisite interfaces. "all" or "" will
@@ -98,10 +102,6 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         #  reset the value to "" so that pulling the interfaces from pyeapi
         #  will just pull them all
         intfs = self.agentMgr_.agent_option("interfaces")
-        if intfs in ("", "all"):
-            intfs = ""
-            self.tracer.trace0("No specific interfaces have been set to be monitored!, monitoring everything")
-
         self.on_agent_option("interfaces", intfs)
         self.tracer.trace0("Fully initialized, running")
 
