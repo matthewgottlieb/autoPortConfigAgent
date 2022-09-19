@@ -144,7 +144,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                         'default interface {}'.format(intfStr),
                         'interface {}'.format(intfStr) ] +defaultCommands + ['commit']
                 self.tracer.trace0("Defaulting interface {}".format(intfStr))
-                self.pyeapi.config(commandSequence)
+                self.pyeapi.config(commandSequence, autoComplete=True)
 
     def on_mac_entry_set(self, mac):
         # .intfs() will return a set of all the interfaces that this mac has been found on
@@ -182,7 +182,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         commandSequence = ['configure session {}'.format(sessionID),
                 'default interface {}'.format(intfStr),
                 'interface {}'.format(intfStr) ] + portConfig + ['commit']
-        self.pyeapi.config(commandSequence)
+        self.pyeapi.config(commandSequence, autoComplete=True)
 
     # the search() function will loop over all configurations in the conf file
     #  and search for both an exact match, an oui match, then finally the default
