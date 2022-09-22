@@ -13,6 +13,16 @@
         "macs": [
           "68d7.9a3c.2b3f"
         ],
+        "lldpCaps": [
+          "isOther",
+          "isRepeater",
+          "isBridge",
+          "isAP",
+          "isRouter",
+          "isTelephone",
+          "isDocsis",
+          "isStation"
+        ],
         "states": {
           "linkup": [
             "description config1"
