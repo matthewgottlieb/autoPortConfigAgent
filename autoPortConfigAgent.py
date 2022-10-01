@@ -2,7 +2,7 @@
 # https://github.com/aristanetworks/EosSdk/blob/master/examples/IntfIpAddrMergeExample.py
 #### http://aristanetworks.github.io/EosSdk/docs/2.19.0/ref/
 
-import eossdk, yaml, json, sys, pyeapi, uuid
+import eossdk, yaml, json, sys, pyeapi, uuid, io, urllib.request, subprocess
 
 class lldpCapsEnum:
     isOther = 0
@@ -42,7 +42,8 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         #  monitor for linkup/linkdown messages.
         self.monitoredInterfaces = []
 
-        self.configFile = "/mnt/flash/autoPortConfig.config"
+        self.configs = {}
+        self.vrf = None
 
 
     # the on_agent_option function is a standard callback called when an option is
@@ -86,42 +87,100 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                     self.watch_intf(eossdk.IntfId(intf), True)
                     self.monitoredInterfaces.append(intf)
 
-    def on_initialized(self):
-        """ Callback provided by AgentHandler when all state is synchronized """
-        # load up the configuration
+        # we may need to use a vrf on the configuration
+        elif optionName == "vrf":
+            if value:
+                self.vrf = value
+            else:
+                self.vrf = None
 
-        self.configs = {}
+            # now we need to re-call the option for config and try to reparse
+            configStr = self.agentMgr_.agent_option("config")
+            self.on_agent_option("config", configStr)
+
+        # order of precedence on config file type will be
+        #   json formatted embedded string
+        #   local file either json or yaml formatted
+        #   remote file either json or yaml formatted
+        # we'll break at the first success
+        elif optionName == "config":
+            # if the config option is being unset, we really want to noop that
+            if value:
+                # try the config as a string
+                self.tracer.trace6(value)
+                try:
+                    self.tracer.trace0("Attempting embedded string")
+                    configFile = io.StringIO(value)
+                    self.configs = self.parseConfig(configFile)
+                except:
+                    pass
+                else:
+                    # there was no exception, it must have parsed. we're done here
+                    self.tracer.trace0("Parsed an embedded string configuration")
+                    return
+
+                # try loading the local file
+                try:
+                    self.tracer.trace0("Attempting a local configuration file")
+                    configFile = open(value, "r")
+                    self.configs = self.parseConfig(configFile)
+                except:
+                    pass
+                else:
+                    # the file parsing worked.  we're done here
+                    self.tracer.trace0("Parsed a local filesystem configuration")
+                    return
+
+                # try loading a remote file
+                try:
+                    self.tracer.trace0("Attempting a remote configuration file")
+                    vrfCMDs = []
+                    if self.vrf:
+                        vrfCMDs = ["ip", "netns", "exec", f"ns-{self.vrf}"]
+
+                    outputStr = subprocess.run(vrfCMDs + ["wget", "-qO", "-", value], text=True, stdout=subprocess.PIPE).stdout
+                    configFile = io.StringIO(outputStr)
+                    self.configs = self.parseConfig(configFile)
+                except Exception as e:
+                    print(e)
+                    pass
+                else:
+                    # the remote file parse worked.  we're done here
+                    self.tracer.trace0("Parsed a remote file configuration")
+                    return
+
+                self.tracer.trace0("Could not parse any configuration information!")
+
+    def parseConfig(self, fileHandle):
+        result = {}
 
         try:
-            with open(self.configFile, "r") as configFile:
-                # let's try yaml first, then fall to json
-                try:
-                    self.tracer.trace5("trying yaml")
-                    self.configs = yaml.safe_load(configFile)
-                    self.tracer.trace1(" - successfully loaded the config as yml")
-                except:
-                    # we failed loading yaml.  let's try json
-                    try:
-                        self.tracer.trace5("trying json")
-                        self.configs = json.load(configFile)
-                        self.tracer.trace1(" - successfully loaded the config as json")
-                    except:
-                        pass
+            result = yaml.safe_load(fileHandle)
         except:
-            self.tracer.trace0("Could not find the configuration file")
+            # we failed loading yaml.  let's try json
+            try:
+                result = json.load(fileHandle)
+            except:
+                pass
 
-        if len(self.configs) == 0:
+        if not isinstance(result, dict) or len(result) == 0:
             self.tracer.trace0("Error loading the configuration")
-            return
+            raise Exception("Error loading the configuration")
 
         # now we need to reformat all the macs, ouis, and lldpcaps to something consistent and usable
-        for config in self.configs['configs']:
+        for config in result['configs']:
             for ar in ['macs', 'ouis']:
                 config['config'][ar] = list(map(formatMac, config['config'].get(ar, [])))
 
             config['config']['lldpCaps'] = self.convertListOfCapsToInt(config['config'].get('lldpCaps', None))
             self.tracer.trace1("config: {} lldpCap: {}".format(config['config']['name'], config['config']['lldpCaps']))
 
+        self.tracer.trace0("- successfully loaded the config")
+
+        return result
+
+    def on_initialized(self):
+        """ Callback provided by AgentHandler when all state is synchronized """
         # by default eossdk doesn't parse the options on load.  we need
         #  to fake the call this will return the option interfaces which
         #  we'll use to determine what to watch.  "all" or "" needs to
@@ -129,6 +188,10 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         #  will just pull them all
         intfs = self.agentMgr_.agent_option("interfaces")
         self.on_agent_option("interfaces", intfs)
+
+        configStr = self.agentMgr_.agent_option("config")
+        self.on_agent_option("config", configStr)
+
         self.tracer.trace0("Fully initialized, running")
         self.tracer.trace5("full config: {}".format(self.configs))
 
