@@ -8,7 +8,7 @@ Configuration data is stored in /mnt/flash/autoPortConfigAgent.config and can be
 
 
 ## Run Location and parameters
-This python agent should be stored in /mnt/flash and is run using the EOS daemon syntax.  There is currently one configuration option
+This python agent should be stored in /mnt/flash and is run using the EOS daemon syntax.  There are currently three configuration options
 
 - "interfaces" an EOS configuration string representing the interfaces that you'd like to monitor.  This string should follow the same syntax as specifying a range in cli configuration mode.  Interface names will be resolved internally to their proper fully qualified forms.  For example: specifying "e1-4" will be automatically expanded as needed to include Ethernet1 through Ethernet4 inclusive.  The use of the keyword "all", or not setting an interfaces option at all, can be used to monitor all interfaces, however this should be used with caution as it may reconfigure uplink ports and disconnect the switch from the network!
 - "config" can be, in preferred order, a single line json formatted string of configuration data, a file on the local switch filesystem, an http/https url to fetch a remote configuration file
