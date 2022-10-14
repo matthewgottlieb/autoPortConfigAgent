@@ -29,7 +29,6 @@ daemon portSet
    exec /mnt/flash/autoPortConfigAgent.py
    option interfaces value all
    option config value https://raw.githubusercontent.com/arista-rockies/autoPortConfigAgent/main/autoPortConfigAgent.json.example
-   option interfaces value all
    option vrf value Management
    no shutdown
 !
