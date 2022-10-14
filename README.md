@@ -1,11 +1,7 @@
 # Arista Auto Port Config Agent
 Spiritual successor to the work by https://github.com/jonathansm/arista-scripts.
 
-This EOS agent will configure interfaces based on MAC or OUI connected to ports when they become operational.  Configuration data can be stored in either YAML or JSON format and is stored in flash.  Ports can also be configured to a default state when they switch to the link down state.
-
-## Config
-Configuration data is stored in /mnt/flash/autoPortConfigAgent.config and can be in YAML or JSON format, with the YAML preferred.  Examples of both formats are provided in this repository.
-
+This EOS agent will configure interfaces based on MAC or OUI connected to ports when they become operational.  Configuration data can be stored in either YAML or JSON format. Examples of both formats are provided in this repository.  Ports can also be configured to a default state when they switch to the link down state.
 
 ## Run Location and parameters
 This python agent should be stored in /mnt/flash and is run using the EOS daemon syntax.  There are currently three configuration options
@@ -13,7 +9,6 @@ This python agent should be stored in /mnt/flash and is run using the EOS daemon
 - "interfaces" an EOS configuration string representing the interfaces that you'd like to monitor.  This string should follow the same syntax as specifying a range in cli configuration mode.  Interface names will be resolved internally to their proper fully qualified forms.  For example: specifying "e1-4" will be automatically expanded as needed to include Ethernet1 through Ethernet4 inclusive.  The use of the keyword "all", or not setting an interfaces option at all, can be used to monitor all interfaces, however this should be used with caution as it may reconfigure uplink ports and disconnect the switch from the network!
 - "config" can be, in preferred order, a single line json formatted string of configuration data, a file on the local switch filesystem, an http/https url to fetch a remote configuration file
 - "vrf" is required when a) using a remote fetch and b) the switch cannot contact the server in the default vrf.  this option is ignored for the other two config variable options.
-
 
 ### Daemon configuration
 Local access to api management interfaces must be configured for this agent to function properly.  This can be done with configuration similar to
