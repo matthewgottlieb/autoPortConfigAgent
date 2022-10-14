@@ -48,5 +48,8 @@ Upon a linkup event for a monitored interface, the agent will begin watching for
 #### linkdown event
 If an interface transitions to a linkdown state, a default configuration can be set on the interface.  If no default is specified in the configuration, no changes will be made.
 
+#### lldp configuration options
+The configuration also supports lldp options on the port.  The example configurations contain lldp configuration options.
+
 ### CVP warning
 This script does not interface with CVP.  As such any configuration applied to the switch may cause the switch to show as out-of-sync within any CVP instance to which this switch is tied.  Manual reconciliation would be required.
