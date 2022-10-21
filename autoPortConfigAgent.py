@@ -208,6 +208,18 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         self.tracer.trace0("on_oper_status for {}".format(intfStr))
 
         if operState == eossdk.INTF_OPER_UP:
+            # if we have a default linkup event type, let's set the port and let the rest of the
+            #   logic take over from there
+            portConfig = self.configs.get('default', [])
+            if 'states' in portConfig and 'linkup' in portConfig['states']:
+                defaultCommands = portConfig['states']['linkup']
+                sessionID = uuid.uuid1()
+                commandSequence = ['configure session {}'.format(sessionID),
+                        'default interface {}'.format(intfStr),
+                        'interface {}'.format(intfStr) ] +defaultCommands + ['commit']
+                self.tracer.trace0("Defaulting interface {}".format(intfStr))
+                self.pyeapi.config(commandSequence, autoComplete=True)
+                
             # searching the list should probably be a really quick loop as there aren't likely
             #   to be a lot of interfaces in the coming up state at the same time
             self.enableInterface(intfStr, mac=True, lldp=True)
