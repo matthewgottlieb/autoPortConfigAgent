@@ -1,31 +1,46 @@
----
+configs:
+- config:
+    lldp:
+      caps:
+      - isOther
+      - isRepeater
+      - isBridge
+      - isAP
+      - isRouter
+      - isTelephone
+      - isDocsis
+      - isStation
+    macs:
+    - 68d7.9a3c.2b3f
+    name: either a specific mac or a set of lldp options
+    states:
+      linkup:
+      - description specificOrLLDP
+- config:
+    lldp:
+      caps:
+      - isBridge
+      - isAP
+      - isRouter
+      macs:
+      - aabb.ccdd.eeff
+    name: a set of lldp options and a specific mac or oui
+    states:
+      linkup:
+      - description specificOrLLDP
+- config:
+    macs:
+    - aaaa.aaaa.aaaa
+    name: either a specific mac or oui
+    ouis:
+    - '7845.58'
+    states:
+      linkup:
+      - description sepecific mac or oui
 default:
   states:
     linkdown:
-      - "description default"
-configs:
-  - config:
-      name: "config1"
-      macs:
-        - "68d7.9a3c.2b3f"
-      lldpCaps:
-        - "isOther"
-        - "isRepeater"
-        - "isBridge"
-        - "isAP"
-        - "isRouter"
-        - "isTelephone"
-        - "isDocsis"
-        - "isStation"
-      states:
-        linkup:
-          - "description config1"
-  - config:
-      name: "config2"
-      macs:
-        - "aaaa.aaaa.aaaa"
-      ouis:
-        - "7845.58"
-      states:
-        linkup:
-          - "description config2"
+    - description default linkdown
+    linkup:
+    - description default linkup
+
