@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # https://github.com/aristanetworks/EosSdk/blob/master/examples/IntfIpAddrMergeExample.py
 #### http://aristanetworks.github.io/EosSdk/docs/2.19.0/ref/
 
@@ -172,8 +172,16 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             for ar in ['macs', 'ouis']:
                 config['config'][ar] = list(map(formatMac, config['config'].get(ar, [])))
 
-            config['config']['lldpCaps'] = self.convertListOfCapsToInt(config['config'].get('lldpCaps', None))
-            self.tracer.trace1("config: {} lldpCap: {}".format(config['config']['name'], config['config']['lldpCaps']))
+            if 'lldp' not in config['config']:
+                continue
+
+            config['config']['lldp']['caps'] = self.convertListOfCapsToInt(config['config'].get('lldp', {}).get('caps', None))
+
+            # make sure to convert any mac like things in the lldp config section if it's there
+            for ar in ['macs', 'ouis']:
+                config['config']['lldp'][ar] = list(map(formatMac, config['config']['lldp'].get(ar, [])))
+
+            self.tracer.trace1("config: {} lldpCap: {}".format(config['config']['name'], config['config']['lldp']['caps']))
 
         self.tracer.trace0("- successfully loaded the config")
 
@@ -306,13 +314,23 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         intfStr = lldpNeighbor.intf().to_string()
 
         self.tracer.trace1("found a new lldp neighbor ***{}*** on ***{}***".format(remoteSystem, intfStr))
+
         if intfStr in self.lldpInterfaces:
             self.disableInterface(intfStr, mac=True, lldp=True)
 
-            portConfig = self.searchLLDPCaps(caps)
+            # we may want to look at the mac address on the neighbor to see if it also matches capabilities.
+            #  python3 introduced some changes with strings and bytes coming out of c-land.  as a result we are
+            #  kinda limited here in how we get the mac address out of the lldppdu passed to us from the sdk.
+            #  the only viable path for us is to use repr() and strip out some extra characters.
+            remoteMac = self.lldpMgr.intf_id(lldpNeighbor).repr()
+            mac = None
+            if (remoteMac[:4] == "MAC:"):
+                mac = formatMac(remoteMac[4:])
+
+            portConfig = self.searchLLDP(caps, mac)
             self.tracer.trace1(" -- config is {}".format(portConfig))
 
-            if 'states' in portConfig and 'linkup' in portConfig['states']:
+            if portConfig and 'states' in portConfig and 'linkup' in portConfig['states']:
                 self.tracer.trace0("Setting a configuration on {}".format(intfStr))
                 self.configureInterface(intfStr, portConfig['states']['linkup'])
 
@@ -380,7 +398,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
         return result
 
-    def searchLLDPCaps(self, lldpCaps):
+    def searchLLDP(self, lldpCaps, mac):
         lldpConfig = None
         lldpCapsInt = self.convertLLDPCapsToInt(lldpCaps)
         self.tracer.trace5("  searching for {}".format(lldpCapsInt))
@@ -388,38 +406,61 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         # main search loop
         self.tracer.trace1("searching for a match of lldp capabilities")
         for config in self.configs['configs']:
-            self.tracer.trace5("   comparing to {}".format(config['config']['lldpCaps']))
-            if config['config']['lldpCaps'] == lldpCapsInt:
+            lldpDict = config['config'].get('lldp', {})
+            lldpDictCaps = lldpDict.get('caps', -1)
+
+            self.tracer.trace5("   comparing to {}".format(lldpDictCaps))
+
+            # we need to also search for a potential mac match on this config to know if this is the one
+            macConfig = True
+            if mac and ('ouis' in lldpDict or 'macs' in lldpDict):
+                macConfig = self._searchMAC(lldpDict, mac)
+
+            if macConfig and lldpDictCaps == lldpCapsInt:
                 lldpConfig = config['config']
                 break
 
         return lldpConfig
 
-    # the searchMAC() function will loop over all configurations in the conf file
-    #  and search for both an exact match, an oui match, then finally the default
-    #  returning the configurations in that order, or None if there is no default
-    def searchMAC(self, mac):
+    def _searchMAC(self, config, mac):
         ouiResult = None
         macResult = None
 
-        # main search loop
-        self.tracer.trace1("searching for {}".format(mac))
-        for config in self.configs['configs']:
-            # look for specific matches for each mac address in the mac table
-            if mac in config['config']['macs']:
-                self.tracer.trace1("found a specific match for {} in {}".format(mac, config))
-                macResult = config['config']
-            # look for oui matches
-            if mac[:6] in config['config']['ouis']:
-                self.tracer.trace1("found an oui match for {} in {}".format(mac, config))
-                ouiResult = config['config']
+        self.tracer.trace0(f"searching for a mac match in {config}")
+        # look for specific matches for each mac address in the mac table
+        if 'macs' in config and mac in config['macs']:
+            self.tracer.trace1("found a specific match for {} in {}".format(mac, config))
+            macResult = config
+        # look for oui matches
+        if 'ouis' in config and mac[:6] in config['ouis']:
+            self.tracer.trace1("found an oui match for {} in {}".format(mac, config))
+            ouiResult = config
 
         if macResult:
             return macResult
         elif ouiResult:
             return ouiResult
         else:
+            # we didn't find any mac or oui match in this config.
+            return None
+
+    # the searchMAC() function will loop over all configurations in the conf file
+    #  and search for both an exact match, an oui match, then finally the default
+    #  returning the configurations in that order, or None if there is no default
+    def searchMAC(self, mac):
+        result = None
+
+        # main search loop
+        self.tracer.trace1("searching for {}".format(mac))
+        for config in self.configs['configs']:
+            result = self._searchMAC(config['config'], mac)
+
+        if result:
+            self.tracer.trace0(f"we found a match in {result}")
+            return result
+        else:
             # we didn't find any mac or oui match.  if there is a default, let's use it
+            self.tracer.trace0("we didn't find a match in any config")
             return self.configs.get('default', None)
 
 if __name__ == "__main__":
