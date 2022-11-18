@@ -454,6 +454,8 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         self.tracer.trace1("searching for {}".format(mac))
         for config in self.configs['configs']:
             result = self._searchMAC(config['config'], mac)
+            if result:
+                break
 
         if result:
             self.tracer.trace0(f"we found a match in {result}")
