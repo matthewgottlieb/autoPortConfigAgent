@@ -37,6 +37,26 @@
     },
     {
       "config": {
+        "name": "a set of lldp options and a specific description substring",
+        "lldp": {
+          "caps": [
+            "isBridge",
+            "isAP",
+            "isRouter"
+          ],
+          "descriptions": [
+            "AP Manufacturer 1"
+          ]
+        },
+        "states": {
+          "linkup": [
+            "description descriptionOrLLDP"
+          ]
+        }
+      }
+    },
+    {
+      "config": {
         "name": "a set of lldp options and a specific mac or oui",
         "lldp": {
           "caps": [

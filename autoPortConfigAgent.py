@@ -312,6 +312,8 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         remoteSystem = self.lldpMgr.system_name(lldpNeighbor)
         caps = self.lldpMgr.system_capabilities(lldpNeighbor)
         intfStr = lldpNeighbor.intf().to_string()
+        remoteDescription = self.lldpMgr.system_description(lldpNeighbor)
+        self.tracer.trace1(f"{remoteDescription}")
 
         self.tracer.trace1("found a new lldp neighbor ***{}*** on ***{}***".format(remoteSystem, intfStr))
 
@@ -327,7 +329,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             if (remoteMac[:4] == "MAC:"):
                 mac = formatMac(remoteMac[4:])
 
-            portConfig = self.searchLLDP(caps, mac)
+            portConfig = self.searchLLDP(caps, mac, remoteDescription)
             self.tracer.trace1(" -- config is {}".format(portConfig))
 
             if portConfig and 'states' in portConfig and 'linkup' in portConfig['states']:
@@ -398,29 +400,72 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
         return result
 
-    def searchLLDP(self, lldpCaps, mac):
-        lldpConfig = None
-        lldpCapsInt = self.convertLLDPCapsToInt(lldpCaps)
-        self.tracer.trace5("  searching for {}".format(lldpCapsInt))
+    def searchLLDP(self, lldpCaps, mac, remoteDescription):
+        # this function is getting a bit complex.  we have a lot of
+        #  optional checks to do for a full match.  we need to be
+        #  cautious
+
+        result = None
+
+        if lldpCaps:
+            lldpCaps = self.convertLLDPCapsToInt(lldpCaps)
 
         # main search loop
-        self.tracer.trace1("searching for a match of lldp capabilities")
+        self.tracer.trace1("searching for an lldp based match")
         for config in self.configs['configs']:
-            lldpDict = config['config'].get('lldp', {})
-            lldpDictCaps = lldpDict.get('caps', -1)
+            self.tracer.trace5(f"  - checking against config {config['config']['name']} ")
 
-            self.tracer.trace5("   comparing to {}".format(lldpDictCaps))
+            configLLDP = config['config'].get('lldp', None)
 
-            # we need to also search for a potential mac match on this config to know if this is the one
-            macConfig = True
-            if mac and ('ouis' in lldpDict or 'macs' in lldpDict):
-                macConfig = self._searchMAC(lldpDict, mac)
+            if not configLLDP:
+                # this config item doesn't have any lldp to check, skip it
+                continue
 
-            if macConfig and lldpDictCaps == lldpCapsInt:
-                lldpConfig = config['config']
+            configCaps = configLLDP.get('caps', None)
+            configDescriptions = configLLDP.get('descriptions', None)
+
+            capsResult = None
+            descResult = None
+            macsResult = None
+
+            if configCaps != None and lldpCaps:
+                # if this config has a caps defined in it, this will set capsResult to a
+                #  boolean reflecting if it's a match.  we can use the None vs Bool to
+                #  know later if a caps check was needed.
+                capsResult = configCaps == lldpCaps
+                self.tracer.trace5(f"      searching for capabilites {lldpCaps}: {capsResult}")
+
+            if configDescriptions != None and remoteDescription:
+                # if this config has a description defined in it, this will set descResult
+                #  to a boolean reflecting if it's a match.  we can use the None vs Bool to
+                #  know later if a descrition match was needed
+                descResult = False
+                for desc in configDescriptions:
+                    descResult = remoteDescription.find(desc) >= 0
+                    if descResult:
+                        break
+                self.tracer.trace5(f"      searching for descriptions {configDescriptions}: {descResult}")
+                
+            if mac and (len(configLLDP.get('ouis', [])) or len(configLLDP.get('macs', []))):
+                # if this config has a mac matc, this will set macsResult
+                #  to a boolean reflecting if it's a match.  we can use the None vs Bool to
+                #  know later if a descrition match was needed
+                macsResult = self._searchMAC(configLLDP, mac) != None
+                self.tracer.trace5(f"      searching for a mac based match: {macsResult}")
+
+            # the determination of if this config is a match.  if *Result is None we didn't need to make the check
+            #  that's a different result than doing the check and getting false back.   basically if we have a False
+            #  on any *Result then this definitely wasn't a match
+            self.tracer.trace0(f"caps: {capsResult}, desc: {descResult}, macs: {macsResult}")
+            if (
+                (capsResult == True or capsResult == None) and
+                (descResult == True or descResult == None) and
+                (macsResult == True or macsResult == None)
+               ):
+                result = config['config']
                 break
 
-        return lldpConfig
+        return result
 
     def _searchMAC(self, config, mac):
         ouiResult = None

@@ -50,5 +50,8 @@ If an interface transitions to a linkdown state, a default configuration can be 
 #### lldp configuration options
 The configuration also supports lldp options on the port.  The example configurations contain lldp configuration options.
 
+#### Supported lldp attributes
+Currently one can match on the lldp capabilities, the as substring search of the remote lldp agent description, the port mac address advertised in the lldppdu, or a combination of these.
+
 ### CVP warning
 This script does not interface with CVP.  As such any configuration applied to the switch may cause the switch to show as out-of-sync within any CVP instance to which this switch is tied.  Manual reconciliation would be required.
