@@ -22,6 +22,18 @@ configs:
       - isBridge
       - isAP
       - isRouter
+      descriptions:
+      - AP Manufacturer 1
+    name: a set of lldp options and a specific description substring
+    states:
+      linkup:
+      - description descriptionOrLLDP
+- config:
+    lldp:
+      caps:
+      - isBridge
+      - isAP
+      - isRouter
       macs:
       - aabb.ccdd.eeff
     name: a set of lldp options and a specific mac or oui
