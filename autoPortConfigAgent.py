@@ -42,7 +42,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         #  monitor for linkup/linkdown messages.
         self.monitoredInterfaces = []
 
-        self.configs = {}
+        self.configs = {"configs":[]}
         self.vrf = None
 
 
@@ -152,7 +152,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 self.tracer.trace0("Could not parse any configuration information!")
 
     def parseConfig(self, fileHandle):
-        result = {}
+        result = {"configs":[]}
 
         try:
             result = yaml.safe_load(fileHandle)
@@ -163,7 +163,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             except:
                 pass
 
-        if not isinstance(result, dict) or len(result) == 0:
+        if not isinstance(result, dict) or len(result['configs']) == 0:
             self.tracer.trace0("Error loading the configuration")
             raise Exception("Error loading the configuration")
 
