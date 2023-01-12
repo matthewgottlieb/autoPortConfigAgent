@@ -326,7 +326,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         self.tracer.trace1("found a new lldp neighbor ***{}*** on ***{}***".format(remoteSystem, intfStr))
 
         if intfStr in self.lldpInterfaces:
-            self.disableInterface(intfStr, mac=False, lldp=True)
+            self.disableInterface(intfStr, mac=True, lldp=True)
 
             # we may want to look at the mac address on the neighbor to see if it also matches capabilities.
             #  python3 introduced some changes with strings and bytes coming out of c-land.  as a result we are
