@@ -159,6 +159,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         except:
             # we failed loading yaml.  let's try json
             try:
+                fileHandle.seek(0)
                 result = json.load(fileHandle)
             except:
                 pass
