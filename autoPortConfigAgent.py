@@ -177,6 +177,14 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
             config['config']['lldp']['caps'] = self.convertListOfCapsToInt(config['config'].get('lldp', {}).get('caps', None))
 
+            # convert any lldp descriptions to lower case
+            # not a huge fan of this loop
+            if 'descriptions' in config['config']['lldp']:
+                descriptions = []
+                for desc in config['config']['lldp']['descriptions']:
+                    descriptions.append(desc.lower())
+                config['config']['lldp']['descriptions'] = descriptions
+
             # make sure to convert any mac like things in the lldp config section if it's there
             for ar in ['macs', 'ouis']:
                 config['config']['lldp'][ar] = list(map(formatMac, config['config']['lldp'].get(ar, [])))
@@ -441,7 +449,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 #  know later if a descrition match was needed
                 descResult = False
                 for desc in configDescriptions:
-                    descResult = remoteDescription.find(desc) >= 0
+                    descResult = remoteDescription.lower().find(desc) >= 0
                     if descResult:
                         break
                 self.tracer.trace5(f"      searching for descriptions {configDescriptions}: {descResult}")
