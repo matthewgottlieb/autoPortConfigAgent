@@ -241,7 +241,8 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             #   to be a lot of interfaces in the coming up state at the same time
             self.enableInterface(intfStr, mac=True, lldp=True)
 
-        elif operState == eossdk.INTF_OPER_DOWN:
+        # only act if the interface is admin enabled, to avoid overriding "shutdown" command
+        elif operState == eossdk.INTF_OPER_DOWN and self.intfMgr_.admin_enabled(intfId):
             # set the default and remove this interface from the list.  if it's the last one,
             #  turn off mac table monitoring.  remove will except... is this better than a try
             #  block?
