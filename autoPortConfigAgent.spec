@@ -1,7 +1,7 @@
 %define _rpmfilename %%{NAME}-%%{VERSION}.%%{ARCH}.rpm
 
 Name:           autoPortConfigAgent
-Version:        2.3.2
+Version:        2.4.0
 Release:        1%{?dist}
 Summary:        Automatically configure ports based on mac or lldp information
 BuildArch:	noarch
