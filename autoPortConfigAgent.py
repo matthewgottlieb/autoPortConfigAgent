@@ -190,7 +190,20 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             for ar in ['macs', 'ouis']:
                 config['config']['lldp'][ar] = list(map(formatMac, config['config']['lldp'].get(ar, [])))
 
+            # data model changes needed to support configurable apply actions
+            config['config']['states'] = self.upgrade_v2_data_model(config['config']['states'])
+
+            # set default apply action where one isn't specified
+            config['config']['states'] = self.set_default_apply_action(config['config']['states'])
+
             self.tracer.trace1("config: {} lldpCap: {}".format(config['config']['name'], config['config']['lldp']['caps']))
+
+        if 'default' in result:
+            # data model changes needed to support configurable apply actions
+            result['default']['states'] = self.upgrade_v2_data_model(result['default']['states'])
+
+            # set default apply action where one isn't specified
+            result['default']['states'] = self.set_default_apply_action(result['default']['states'])
 
         self.tracer.trace0("- successfully loaded the config")
 
@@ -229,14 +242,9 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             #   logic take over from there
             portConfig = self.configs.get('default', [])
             if 'states' in portConfig and 'linkup' in portConfig['states']:
-                defaultCommands = portConfig['states']['linkup']
-                sessionID = uuid.uuid1()
-                commandSequence = ['configure session {}'.format(sessionID),
-                        'default interface {}'.format(intfStr),
-                        'interface {}'.format(intfStr) ] +defaultCommands + ['commit']
                 self.tracer.trace0("Defaulting interface {}".format(intfStr))
-                self.pyeapi.config(commandSequence, autoComplete=True)
-                
+                self.configureInterface(intfStr, portConfig['states']['linkup']['cli_commands'], portConfig['states']['linkup']['apply_action'])
+
             # searching the list should probably be a really quick loop as there aren't likely
             #   to be a lot of interfaces in the coming up state at the same time
             self.enableInterface(intfStr, mac=True, lldp=True)
@@ -250,13 +258,8 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             # set the interface to a default if one exists
             portConfig = self.configs.get('default', [])
             if 'states' in portConfig and 'linkdown' in portConfig['states']:
-                defaultCommands = portConfig['states']['linkdown']
-                sessionID = uuid.uuid1()
-                commandSequence = ['configure session {}'.format(sessionID),
-                        'default interface {}'.format(intfStr),
-                        'interface {}'.format(intfStr) ] +defaultCommands + ['commit']
                 self.tracer.trace0("Defaulting interface {}".format(intfStr))
-                self.pyeapi.config(commandSequence, autoComplete=True)
+                self.configureInterface(intfStr, portConfig['states']['linkdown']['cli_commands'], portConfig['states']['linkdown']['apply_action'])
 
     # this function will handle enabling interface monitoring and setting
     #  up the sdk as needed
@@ -343,17 +346,20 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
             if portConfig and 'states' in portConfig and 'linkup' in portConfig['states']:
                 self.tracer.trace0("Setting a configuration on {}".format(intfStr))
-                self.configureInterface(intfStr, portConfig['states']['linkup'])
+                self.configureInterface(intfStr, portConfig['states']['linkup']['cli_commands'], portConfig['states']['linkup']['apply_action'])
 
-    # by default we will remove all configuration from the interface before adding new
-    #  configuration specified in the conf file.  using a config session allows us to
-    #  potentially apply an identical configuration on the interface without causing
-    #  impact to network traffic
-    def configureInterface(self, intfStr, portConfig):
+    # by default (apply_action = replace) we will remove all configuration from the interface before adding new
+    #  configuration specified in the conf file.  using a config session allows us to potentially apply an identical 
+    #  configuration on the interface without causing  impact to network traffic
+    def configureInterface(self, intfStr, portConfig, apply_action):
         sessionID = uuid.uuid1()
-        commandSequence = ['configure session {}'.format(sessionID),
-                'default interface {}'.format(intfStr),
-                'interface {}'.format(intfStr) ] + portConfig + ['commit']
+        commandSequence = []
+        commandSequence.append(f'configure session {sessionID}')
+        if apply_action == 'replace':
+            commandSequence.append(f'default interface {intfStr}')
+        commandSequence.append(f'interface {intfStr}')
+        commandSequence.extend(portConfig)
+        commandSequence.append('commit')
         self.pyeapi.config(commandSequence, autoComplete=True)
 
     # this function will convert the lldp system capabilities to an integer
@@ -518,6 +524,29 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             # we didn't find any mac or oui match.  if there is a default, let's use it
             self.tracer.trace0("we didn't find a match in any config")
             return self.configs.get('default', None)
+        
+    def upgrade_v2_data_model(self, section):
+        """ convert old data model format to new version ('cli_commands' as an attribute of 'state') """
+        for state in ['linkup', 'linkdown']:
+            if state in section:
+                # convert old config file format ('state' is a list of cli commands itself)
+                if isinstance(section[state], list):
+                    cli_commands = section[state]
+                    section[state] = {"cli_commands" : cli_commands}
+
+                # add default apply action (replace)
+                if not 'apply_action' in section[state]:
+                    section[state]['apply_action'] = 'replace'
+        return section
+    
+    def set_default_apply_action(self, section):
+        """ configure a default apply action to states where one isn't specified """
+        for state in ['linkup', 'linkdown']:
+            if state in section:
+                # add default apply action (replace)
+                if not 'apply_action' in section[state]:
+                    section[state]['apply_action'] = 'replace'
+        return section
 
 if __name__ == "__main__":
     sdk = eossdk.Sdk()
