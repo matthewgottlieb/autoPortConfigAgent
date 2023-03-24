@@ -34,6 +34,18 @@ configs:
       - isBridge
       - isAP
       - isRouter
+      names:
+      - xyz123
+    name: a set of lldp capabilities and a specific system name substring
+    states:
+      linkup:
+      - description LLDPnameAndCapabilities
+- config:
+    lldp:
+      caps:
+      - isBridge
+      - isAP
+      - isRouter
       macs:
       - aabb.ccdd.eeff
     name: a set of lldp options and a specific mac or oui
