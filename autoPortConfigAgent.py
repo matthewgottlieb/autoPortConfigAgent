@@ -186,6 +186,10 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                     descriptions.append(desc.lower())
                 config['config']['lldp']['descriptions'] = descriptions
 
+            # convert any lldp names to lower case
+            if 'names' in config['config']['lldp']:
+                config['config']['lldp']['names'] = [ name.lower() for name in config['config']['lldp']['names'] ]
+
             # make sure to convert any mac like things in the lldp config section if it's there
             for ar in ['macs', 'ouis']:
                 config['config']['lldp'][ar] = list(map(formatMac, config['config']['lldp'].get(ar, [])))
@@ -338,7 +342,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             if (remoteMac[:4] == "MAC:"):
                 mac = formatMac(remoteMac[4:])
 
-            portConfig = self.searchLLDP(caps, mac, remoteDescription)
+            portConfig = self.searchLLDP(caps, mac, remoteDescription, remoteSystem)
             self.tracer.trace1(" -- config is {}".format(portConfig))
 
             if portConfig and 'states' in portConfig and 'linkup' in portConfig['states']:
@@ -409,7 +413,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
         return result
 
-    def searchLLDP(self, lldpCaps, mac, remoteDescription):
+    def searchLLDP(self, lldpCaps, mac, remoteDescription, remoteSystem):
         # this function is getting a bit complex.  we have a lot of
         #  optional checks to do for a full match.  we need to be
         #  cautious
@@ -432,9 +436,11 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
             configCaps = configLLDP.get('caps', None)
             configDescriptions = configLLDP.get('descriptions', None)
+            configNames = configLLDP.get('names', None)
 
             capsResult = None
             descResult = None
+            nameResult = None
             macsResult = None
 
             if configCaps != None and lldpCaps:
@@ -455,6 +461,17 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                         break
                 self.tracer.trace5(f"      searching for descriptions {configDescriptions}: {descResult}")
                 
+            if configNames != None and remoteSystem:
+                # if this config has a name defined in it, this will set nameResult
+                #  to a boolean reflecting if it's a match.  we can use the None vs Bool to
+                #  know later if a name match was needed
+                nameResult = False
+                for name in configNames:
+                    nameResult = remoteSystem.lower().find(name) >= 0
+                    if nameResult:
+                        break
+                self.tracer.trace5(f"      searching for names {configNames}: {nameResult}")
+                
             if mac and (len(configLLDP.get('ouis', [])) or len(configLLDP.get('macs', []))):
                 # if this config has a mac matc, this will set macsResult
                 #  to a boolean reflecting if it's a match.  we can use the None vs Bool to
@@ -465,10 +482,11 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             # the determination of if this config is a match.  if *Result is None we didn't need to make the check
             #  that's a different result than doing the check and getting false back.   basically if we have a False
             #  on any *Result then this definitely wasn't a match
-            self.tracer.trace0(f"caps: {capsResult}, desc: {descResult}, macs: {macsResult}")
+            self.tracer.trace0(f"caps: {capsResult}, desc: {descResult}, name: {nameResult}, macs: {macsResult}")
             if (
                 (capsResult == True or capsResult == None) and
                 (descResult == True or descResult == None) and
+                (nameResult == True or nameResult == None) and
                 (macsResult == True or macsResult == None)
                ):
                 result = config['config']
