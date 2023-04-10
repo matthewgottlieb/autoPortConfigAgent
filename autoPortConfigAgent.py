@@ -228,6 +228,10 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
         self.tracer.trace0("on_oper_status for {}".format(intfStr))
 
+        if intfStr not in self.monitoredInterfaces:
+            self.tracer.trace0(f" - skipping {intfStr} as it's not being monitored")
+            return
+
         if operState == eossdk.INTF_OPER_UP:
             # if we have a default linkup event type, let's set the port and let the rest of the
             #   logic take over from there
