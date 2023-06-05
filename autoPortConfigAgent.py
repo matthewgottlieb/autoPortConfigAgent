@@ -210,8 +210,12 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
         intfs = self.agentMgr_.agent_option("interfaces")
         self.on_agent_option("interfaces", intfs)
 
-        configStr = self.agentMgr_.agent_option("config")
-        self.on_agent_option("config", configStr)
+        vrfStr = self.agentMgr_.agent_option("vrf")
+        if vrfStr:
+            self.on_agent_option("vrf", vrfStr)
+        else:
+            configStr = self.agentMgr_.agent_option("config")
+            self.on_agent_option("config", configStr)
 
         self.tracer.trace0("Fully initialized, running")
         self.tracer.trace5("full config: {}".format(self.configs))
