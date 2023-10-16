@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # https://github.com/aristanetworks/EosSdk/blob/master/examples/IntfIpAddrMergeExample.py
 #### http://aristanetworks.github.io/EosSdk/docs/2.19.0/ref/
+##  updates
 
 import eossdk, yaml, json, sys, pyeapi, uuid, io, urllib.request, subprocess
 
@@ -44,6 +45,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
 
         self.configs = {"configs":[]}
         self.vrf = None
+        self.enableLLDP = True
 
 
     # the on_agent_option function is a standard callback called when an option is
@@ -52,7 +54,13 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
     #  on initial startup
     def on_agent_option(self, optionName, value):
         # if we have a new batch of interfaces to watch, let's figure them out
-        if optionName == "interfaces":
+        if optionName == "enableLLDP":
+            if value and value.lower() == "true":
+                self.enableLLDP = True
+            else:
+                self.enableLLDP = False
+
+        elif optionName == "interfaces":
             # turn off any monitoring that's already on
             self.tracer.trace5("Disabling all interface monitoring")
             self.watch_all_intfs(False)
@@ -217,6 +225,9 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
             configStr = self.agentMgr_.agent_option("config")
             self.on_agent_option("config", configStr)
 
+        lldp = self.agentMgr_.agent_option("enableLLDP")
+        self.on_agent_option("enableLLDP", lldp)
+
         self.tracer.trace0("Fully initialized, running")
         self.tracer.trace5("full config: {}".format(self.configs))
 
@@ -251,7 +262,7 @@ class InterfaceMonitor(eossdk.AgentHandler, eossdk.IntfHandler, eossdk.MacTableH
                 
             # searching the list should probably be a really quick loop as there aren't likely
             #   to be a lot of interfaces in the coming up state at the same time
-            self.enableInterface(intfStr, mac=True, lldp=True)
+            self.enableInterface(intfStr, mac=True, lldp=self.enableLLDP)
 
         # only act if the interface is admin enabled, to avoid overriding "shutdown" command
         elif operState == eossdk.INTF_OPER_DOWN and self.intfMgr_.admin_enabled(intfId):
